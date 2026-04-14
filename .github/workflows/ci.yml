@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Syntax & Structure Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Check recipe structure
+        run: |
+          status=0
+          for dir in [0-9][0-9]_*/; do
+            [ -f "${dir}main.py" ]   || { echo "MISSING ${dir}main.py";   status=1; }
+            [ -f "${dir}README.md" ] || { echo "MISSING ${dir}README.md"; status=1; }
+          done
+          exit $status
+
+      - name: Syntax check all recipes
+        run: |
+          status=0
+          for dir in [0-9][0-9]_*/; do
+            python -m py_compile "${dir}main.py" || { echo "SYNTAX ERROR: ${dir}main.py"; status=1; }
+          done
+          exit $status
+
+      - name: Check imports resolve
+        run: |
+          status=0
+          for dir in [0-9][0-9]_*/; do
+            python -c "import ast; ast.parse(open('${dir}main.py').read())" || { echo "PARSE ERROR: ${dir}main.py"; status=1; }
+          done
+          exit $status
+
+      - name: Check notebook structure
+        run: |
+          status=0
+          for dir in [0-9][0-9]_*/; do
+            if [ -f "${dir}notebook.ipynb" ]; then
+              python -c "import json; json.load(open('${dir}notebook.ipynb'))" || { echo "INVALID NOTEBOOK: ${dir}notebook.ipynb"; status=1; }
+            fi
+          done
+          exit $status
